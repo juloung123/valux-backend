@@ -1,0 +1,31 @@
+{
+  "displayName": "valux-backend-e2e",
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "roots": ["<rootDir>"],
+  "testMatch": ["**/*.e2e-spec.ts"],
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapping": {
+    "^@/(.*)$": "<rootDir>/../src/$1",
+    "^@test/(.*)$": "<rootDir>/$1"
+  },
+  "setupFilesAfterEnv": ["<rootDir>/setup.ts"],
+  "testTimeout": 60000,
+  "collectCoverageFrom": [
+    "../src/**/*.(t|j)s",
+    "!../src/**/*.spec.ts",
+    "!../src/**/*.e2e-spec.ts",
+    "!../src/main.ts"
+  ],
+  "coverageDirectory": "./coverage-e2e",
+  "verbose": true,
+  "forceExit": true,
+  "detectOpenHandles": true,
+  "globals": {
+    "ts-jest": {
+      "tsconfig": "../tsconfig.json"
+    }
+  }
+}

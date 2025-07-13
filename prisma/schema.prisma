@@ -1,0 +1,206 @@
+// Valux.finance Database Schema
+// DeFi Automation Platform - Non-Custodial Profit Distribution
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model - Wallet addresses and authentication
+model User {
+  id          String   @id @default(cuid())
+  address     String   @unique @map("wallet_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relationships
+  rules       Rule[]
+  portfolios  Portfolio[]
+  
+  @@map("users")
+}
+
+// Vault Model - DeFi vaults (Aave, Compound, Lido, etc.)
+model Vault {
+  id                  String   @id @default(cuid())
+  name                String
+  address             String   @unique @map("contract_address")
+  protocol            String   // "aave", "compound", "lido", "curve", "yearn", "balancer"
+  tokenAddress        String   @map("token_address")
+  tokenSymbol         String   @map("token_symbol")
+  apy                 Float    // Annual Percentage Yield
+  riskLevel           String   @map("risk_level") // "low", "medium", "high"
+  category            String   // "stable", "yield", "growth"
+  tvl                 Decimal  @db.Decimal(20, 8) // Total Value Locked
+  active              Boolean  @default(true)
+  insuranceAvailable  Boolean  @default(false) @map("insurance_available")
+  autoCompounding     Boolean  @default(false) @map("auto_compounding")
+  withdrawalTerms     String?  @map("withdrawal_terms") // "instant", "7days", "30days"
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  
+  // Relationships
+  rules               Rule[]
+  portfolios          Portfolio[]
+  vaultPerformance    VaultPerformance[]
+  
+  @@map("vaults")
+}
+
+// Vault Performance Model - Historical APY and performance data
+model VaultPerformance {
+  id        String   @id @default(cuid())
+  vaultId   String   @map("vault_id")
+  apy       Float    // APY at this timestamp
+  tvl       Decimal  @db.Decimal(20, 8) // TVL at this timestamp
+  timestamp DateTime @default(now())
+  
+  // Relationships
+  vault     Vault    @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  
+  @@map("vault_performance")
+  @@index([vaultId, timestamp])
+}
+
+// Rule Model - Automation rules for profit distribution
+model Rule {
+  id               String    @id @default(cuid())
+  name             String
+  description      String?
+  userId           String    @map("user_id")
+  vaultId          String    @map("vault_id")
+  trigger          String    // "weekly", "monthly", "quarterly", "profit_threshold"
+  profitThreshold  Decimal?  @db.Decimal(20, 8) @map("profit_threshold") // For profit_threshold trigger
+  active           Boolean   @default(true)
+  lastExecuted     DateTime? @map("last_executed")
+  nextExecution    DateTime? @map("next_execution")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  
+  // Relationships
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vault           Vault           @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  distributions   Distribution[]
+  executions      RuleExecution[]
+  
+  @@map("rules")
+  @@index([userId])
+  @@index([vaultId])
+  @@index([nextExecution])
+}
+
+// Distribution Model - Profit distribution settings within rules
+model Distribution {
+  id            String  @id @default(cuid())
+  ruleId        String  @map("rule_id")
+  recipient     String  // wallet address or "reinvest"
+  percentage    Float   // 0-100
+  description   String?
+  type          String  @default("wallet") // "wallet", "reinvest"
+  
+  // Relationships
+  rule          Rule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  @@map("distributions")
+  @@index([ruleId])
+}
+
+// Rule Execution Model - History of rule executions
+model RuleExecution {
+  id             String   @id @default(cuid())
+  ruleId         String   @map("rule_id")
+  executedAt     DateTime @default(now()) @map("executed_at")
+  profitAmount   Decimal  @db.Decimal(20, 8) @map("profit_amount")
+  gasUsed        Decimal? @db.Decimal(20, 8) @map("gas_used")
+  gasFee         Decimal? @db.Decimal(20, 8) @map("gas_fee")
+  transactions   Json     // Array of transaction hashes and details
+  status         String   // "completed", "failed", "pending"
+  errorMessage   String?  @map("error_message")
+  performanceFee Decimal? @db.Decimal(20, 8) @map("performance_fee") // 0.5% platform fee
+  
+  // Relationships
+  rule           Rule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  @@map("rule_executions")
+  @@index([ruleId])
+  @@index([executedAt])
+  @@index([status])
+}
+
+// Portfolio Model - User positions and performance tracking
+model Portfolio {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  vaultId           String   @map("vault_id")
+  depositAmount     Decimal  @db.Decimal(20, 8) @map("deposit_amount") // Total deposited
+  currentValue      Decimal  @db.Decimal(20, 8) @map("current_value")  // Current vault share value
+  unrealizedPnl     Decimal  @db.Decimal(20, 8) @map("unrealized_pnl") // Unrealized P&L
+  realizedPnl       Decimal  @db.Decimal(20, 8) @map("realized_pnl")   // Realized P&L from distributions
+  totalDistributed  Decimal  @db.Decimal(20, 8) @default(0) @map("total_distributed") // Total profits distributed
+  avgAPY            Float?   @map("avg_apy") // Average APY since first deposit
+  firstDepositAt    DateTime @map("first_deposit_at")
+  lastUpdated       DateTime @default(now()) @map("last_updated")
+  
+  // Relationships
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vault             Vault            @relation(fields: [vaultId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]
+  
+  @@unique([userId, vaultId])
+  @@map("portfolios")
+  @@index([userId])
+  @@index([vaultId])
+}
+
+// Transaction Model - All user transactions (deposits, withdrawals, distributions)
+model Transaction {
+  id              String   @id @default(cuid())
+  portfolioId     String   @map("portfolio_id")
+  hash            String   @unique @map("transaction_hash")
+  type            String   // "deposit", "withdrawal", "distribution", "reinvest"
+  amount          Decimal  @db.Decimal(20, 8)
+  tokenSymbol     String   @map("token_symbol")
+  status          String   // "pending", "confirmed", "failed"
+  blockNumber     Int?     @map("block_number")
+  gasUsed         Decimal? @db.Decimal(20, 8) @map("gas_used")
+  gasFee          Decimal? @db.Decimal(20, 8) @map("gas_fee")
+  fromAddress     String?  @map("from_address")
+  toAddress       String?  @map("to_address")
+  executedAt      DateTime @default(now()) @map("executed_at")
+  confirmedAt     DateTime? @map("confirmed_at")
+  
+  // Relationships
+  portfolio       Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  
+  @@map("transactions")
+  @@index([portfolioId])
+  @@index([hash])
+  @@index([type])
+  @@index([status])
+  @@index([executedAt])
+}
+
+// Platform Analytics Model - Platform-wide metrics
+model PlatformAnalytics {
+  id                    String   @id @default(cuid())
+  date                  DateTime @unique @map("analytics_date") @db.Date
+  totalTVL              Decimal  @db.Decimal(20, 8) @map("total_tvl")
+  totalUsers            Int      @map("total_users")
+  activeUsers24h        Int      @map("active_users_24h")
+  totalTransactions     Int      @map("total_transactions")
+  transactionVolume24h  Decimal  @db.Decimal(20, 8) @map("transaction_volume_24h")
+  totalFeesGenerated    Decimal  @db.Decimal(20, 8) @map("total_fees_generated")
+  feesGenerated24h      Decimal  @db.Decimal(20, 8) @map("fees_generated_24h")
+  totalRules            Int      @map("total_rules")
+  activeRules           Int      @map("active_rules")
+  totalDistributed      Decimal  @db.Decimal(20, 8) @map("total_distributed")
+  avgAPY                Float    @map("avg_apy")
+  createdAt             DateTime @default(now()) @map("created_at")
+  
+  @@map("platform_analytics")
+  @@index([date])
+}
