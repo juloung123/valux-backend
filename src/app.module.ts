@@ -7,6 +7,9 @@ import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './database/database.module';
 import { VaultsModule } from './vaults/vaults.module';
 import { AuthModule } from './auth/auth.module';
+import { PortfolioModule } from './portfolio/portfolio.module';
+import { RulesModule } from './rules/rules.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -23,6 +26,9 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     DatabaseModule,
     VaultsModule,
     AuthModule,
+    PortfolioModule,
+    RulesModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [
