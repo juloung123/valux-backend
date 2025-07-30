@@ -25,9 +25,9 @@ export class PortfolioService {
   async getPortfolioOverview(address: string): Promise<PortfolioOverviewDto> {
     this.logger.log(`Getting portfolio overview for address: ${address}`);
 
-    // Find user by address
+    // Find user by address (normalized to lowercase)
     const user = await this.prisma.user.findUnique({
-      where: { address },
+      where: { address: address.toLowerCase() },
     });
 
     if (!user) {
@@ -98,9 +98,9 @@ export class PortfolioService {
   async getPortfolioPositions(address: string): Promise<PortfolioPositionDto[]> {
     this.logger.log(`Getting portfolio positions for address: ${address}`);
 
-    // Find user by address
+    // Find user by address (normalized to lowercase)
     const user = await this.prisma.user.findUnique({
-      where: { address },
+      where: { address: address.toLowerCase() },
     });
 
     if (!user) {

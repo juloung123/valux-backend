@@ -147,6 +147,7 @@ This request will not trigger a blockchain transaction or cost any gas fees.`;
     }
   }
 
+
   async validateUser(userId: string, address: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
